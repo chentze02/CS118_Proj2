@@ -3,7 +3,9 @@
 #include <fstream>
 #include <cstring>
 #include <unistd.h>
+#include <chrono>
 #include "utils.h"
+#include <fcntl.h>
 using namespace std;
 
 int main(int argc, char *argv[])
@@ -29,11 +31,14 @@ int main(int argc, char *argv[])
 
     // Create a UDP socket for listening
     listen_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+
     if (listen_sockfd < 0)
     {
         perror("Could not create listen socket");
         return 1;
     }
+
+    fcntl(listen_sockfd, F_SETFL, O_NONBLOCK);
 
     // Create a UDP socket for sending
     send_sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -125,8 +130,25 @@ int main(int argc, char *argv[])
 
             // Check for acknowledgment
             cout << "CHECK" << endl;
-            recvfrom(listen_sockfd, &ack_pkt, sizeof(ack_pkt), 0,
-                     reinterpret_cast<sockaddr *>(&server_addr_from), &addr_size);
+            ssize_t received_bytes = recvfrom(listen_sockfd, &ack_pkt, sizeof(ack_pkt), 0,
+                                              reinterpret_cast<sockaddr *>(&server_addr_from), &addr_size);
+
+            if (received_bytes > 0)
+            {
+                std::cout << "Received " << received_bytes << " bytes.\n";
+                // Process the received data
+            }
+            else if (received_bytes == 0)
+            {
+                std::cout << "Connection closed by the peer.\n";
+            }
+            else
+            {
+                std::cout << "Error receiving data: " << strerror(errno) << "\n";
+                perror("recvfrom");
+                ack_received = true; // Exit the loop if an error occurs
+                // Handle the error using errno if needed
+            }
 
             cout << "CHECK 2" << endl;
 
